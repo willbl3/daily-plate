@@ -1,0 +1,2 @@
+// Public Supabase URL and publishable/anon key only. Never place a service-role key here.
+window.DAILY_PLATE_CONFIG = {"supabaseUrl":"https://sruhciaylwubobjxkfcb.supabase.co","supabasePublishableKey":"sb_publishable_dE8_teF0kLtEiHQWi6b8mQ_jqdTqzTf","supabaseFunctionKey":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNydWhjaWF5bHd1Ym9ianhrZmNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM3NDUwMTgsImV4cCI6MjEwOTMyMTAxOH0.3otHiRJfMelRqdxDCbyjS8h1FKOFIeVegh6yuysE7A4"};

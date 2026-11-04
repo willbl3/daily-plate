@@ -1,32 +1,53 @@
 # Daily Plate
 
-A responsive, buildless meal tracker. Live site: https://willbl3.github.io/daily-plate/
+Live website: https://willbl3.github.io/daily-plate/
+
+Responsive meal journal with private Supabase accounts, cloud saving, ingredient weights, daily calorie goals, year calendar, weigh-ins, meal estimates, recipes and College Station dining search.
+
+## Accounts
+
+Choose Sign in → Create an account. Usernames use 3–24 letters, digits or underscores. Passwords have 10–128 characters. Save the recovery code shown after signup; no email address is required. Use the same account on phone and computer to load your private journal.
+
+Original device-only logs remain intact. After signing in, use Import this device’s original journal to copy them into cloud storage. This replaces the account journal after confirmation. Export first if you need both copies.
+
+Sidebar status reports whether edits reached the cloud. Offline edits stay in an account-specific cache and sync when online. Cloud updates load on focus and every 30 seconds while visible. Version conflicts pause syncing and offer export, loading the cloud copy or explicitly replacing it. Sign-out waits for pending saves and removes the local account cache; cloud data remains.
 
 ## Features
 
-- Ingredient search, custom nutrition labels, gram/ounce/pound weights and serving counts.
-- Recipe batch servings and portion calculations; calories, protein, carbs and fat.
-- Meals by date with editing, deletion, repeat-today and completed-day controls.
-- Adult calorie calculator using Mifflin–St Jeor, activity and cut/maintain/gain pace; optional calorie override.
-- Goal history effective by date, configurable tolerance, and all twelve calendar months.
-- Green completed days within tolerance, red completed days outside it or past unfinished logs, amber current in-progress logs, neutral unlogged/future days.
-- Selected US Chick-fil-A and McDonald's menu snapshots with nutrition source links. Not a live restaurant API or a complete menu. Checked November 3, 2026; menu formulations may change. Generic ingredients are estimates; custom labels take precedence for branded products.
-- Local browser persistence, JSON backup export/import. No account or cross-device cloud sync. No profile or meal data is sent to GitHub. Google Fonts is the only external runtime resource.
+- Ingredient weights in grams, ounces, pounds or label servings; recipe batch servings and portions eaten.
+- Meal editing, deletion, repeat-today and daily completion.
+- Adult calorie calculator, cut/maintain/gain pace, overrides, dated goal history and hover/focus/tap explanations.
+- Full year calorie calendar: green completed days within tolerance, red completed days outside it or past unfinished meal logs, current in-progress days amber, unlogged/future days neutral.
+- Tap any past calendar square to add/edit a weigh-in or open its food journal. Weight-only days stay neutral for calories; blue dots mark weigh-ins.
+- Weight history, lb/kg display, trend chart and a seven-calendar-day average anchored to the latest weigh-in. Weight logs do not automatically change calorie goals.
+- Twelve rough meal estimates with stated portions/ranges, including tacos and spaghetti.
+- Six meal-prep recipes with ingredient-derived portion nutrition, steps/storage guidance; save personal recipes too.
+- Ten balanced restaurant order ideas, distinguishing published nutrition, calculated builds and rough estimates.
+- More than 70 starting College Station-area restaurant names, menu/name search, map links and optional live OpenStreetMap expansion. Coverage is not exhaustive; verify locations and business status. Listings do not imply published macros. Missing nutrition routes to estimates/custom labels.
+- JSON backup export/import. Backups contain private data.
 
-## Run
+## Backend and privacy
 
-Serve this directory with any static HTTP server, for example `python -m http.server 8080`, then open http://localhost:8080. No build, packages, API keys or secrets are required. GitHub Pages can serve `main` from `/ (root)`.
+The frontend remains buildless on GitHub Pages. config.js contains public browser keys only. Supabase provides the service-role key to the Edge Function at runtime; it is never in source or browser code.
 
-## Nutrition methodology
+daily_plate_journals stores one JSON document and monotonic revision per account. RLS requires auth.uid() = user_id for reads/writes. The save_daily_plate_journal RPC rejects stale revisions. Recovery hashes and rate-limit records deny all browser-role access. account-register.ts is the deployed Edge Function; supabase-schema.sql records the initial deployed schema.
+
+Username accounts use internal synthetic email identifiers (username@users.dailyplate.invalid), not contact addresses. Supabase Auth hashes passwords and manages sessions. Signup/recovery are rate-limited. Recovery codes contain 128 random bits and are stored only as SHA-256 hashes server-side.
+
+vendor-supabase.js is the official UMD client pinned to supabase-js 2.118.0 (MIT). Google Fonts loads externally. Optional nearby lookup calls Overpass only on click and sends a fixed area query, not personal profile data.
+
+## Run and checks
+
+Serve the directory with any static HTTP server, e.g. python -m http.server 8080. No frontend build is required. Signup/recovery CORS permits the production GitHub origin; test these there or configure an authorized development origin.
+
+Run node verify.cjs for 22 functional checks. Live API checks also verified signup, independent sessions, private saving/loading, account isolation, stale-write rejection, denial of anonymous/recovery-table reads and code-based recovery. Synthetic QA accounts were removed.
+
+## Nutrition sources
 
 Mifflin–St Jeor: https://pubmed.ncbi.nlm.nih.gov/2305711/
 
-NIH planning reference: https://www.niddk.nih.gov/health-information/weight-management/body-weight-planner
+NIH planner: https://www.niddk.nih.gov/health-information/weight-management/body-weight-planner
 
-Calculator estimates use 500 kcal/day per 1 lb/week. Deficits capped at 25% maintenance, surpluses at 15%, with 1,500 kcal male / 1,200 kcal female floors. These are broad planning estimates, not individualized medical care or guaranteed rates of change. Protein starts at 1.8 g/kg (capped at 35% energy), fat at 25%, remaining calories from carbohydrates. Menu calories are kept as published rather than forced to equal rounded macro energy.
+Food storage: https://www.foodsafety.gov/food-safety-charts/cold-food-storage-charts
 
-Restaurant snapshots: https://www.chick-fil-a.com/nutrition-allergens and the individual McDonald's product pages linked in the app.
-
-## Privacy and backups
-
-Data lives in localStorage under `daily-plate-v1`, tied to the browser and website origin. Browser data clearing removes it. Export before clearing storage, moving devices, or changing domains. Import replaces the current local dataset after confirmation and validates its structure. Backups contain personal profile and food-log data; keep them private. Repository source contains no personal logs or profile defaults.
+Menu sources are linked in the app and food-data.js. Generic foods/recipes are estimates; product labels and portions matter. Pace initially uses 500 kcal/day per 1 lb/week, capped at a 25% maintenance deficit or 15% surplus, with 1,500 kcal male / 1,200 female floors. Weight and muscle change are not guaranteed.

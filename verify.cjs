@@ -23,3 +23,28 @@ test('Valid exported data can be reloaded',()=>{context.backup=memory.get('daily
 test('Full year calendar renders 12 months and leap day',()=>{run('year=2028;renderCalendar()');assert.equal((el('months').innerHTML.match(/class="card month"/g)||[]).length,12);assert.ok(el('months').innerHTML.includes('data-date="2028-02-29"'));});
 console.log(`${count} checks passed.`);
 
+// Exercise the upgrade with a minimal DOM surface, without network or user data.
+for(const element of elements.values()){
+ element.closest=()=>({insertBefore(){}});element.setAttribute=()=>{};element.getAttribute=()=>'';
+ element.showModal=()=>{element.open=true;};element.close=()=>{element.open=false;};element.reset=()=>{};
+ element.classList.add=()=>{};element.classList.remove=()=>{};element.querySelector=()=>({onclick:null,setAttribute(){}});
+}
+const originalEl=el;
+context.document.getElementById=id=>{const e=originalEl(id);e.closest??=()=>({insertBefore(){}});e.setAttribute??=()=>{};e.getAttribute??=()=>'';e.showModal??=()=>{e.open=true;};e.close??=()=>{e.open=false;};e.reset??=()=>{};e.classList.add??=()=>{};e.classList.remove??=()=>{};return e;};
+context.document.addEventListener=()=>{};
+context.document.createElement=()=>({className:'',innerHTML:'',querySelector:()=>({setAttribute(){}})});
+context.setInterval=()=>{};context.navigator={onLine:true};context.document.visibilityState='visible';
+context.localStorage.removeItem=k=>memory.delete(k);
+run(fs.readFileSync('food-data.js','utf8'));run(fs.readFileSync('extras.js','utf8'));
+test('Weight conversion round trip',()=>assert.ok(Math.abs(run('weightIn(toKg(190,"lb"),"lb")')-190)<.00001));
+test('Weight-only day remains neutral in calorie calendar',()=>{run('state.days[today]={complete:false,meals:[],weight:{kg:80,note:"test"}}');assert.equal(run('dayStatus(today)'),'neutral');});
+test('Weigh-in trend uses an actual seven-calendar-day window',()=>{run('state.days={"2026-10-01":{complete:false,meals:[],weight:{kg:90,note:""}},"2026-10-15":{complete:false,meals:[],weight:{kg:80,note:""}},"2026-10-17":{complete:false,meals:[],weight:{kg:82,note:""}}}');assert.equal(run('weightStats().average'),81);assert.equal(run('weightStats().latest'),82);});
+test('Every meal-prep recipe has valid ingredients and positive portion macros',()=>{assert.ok(run('prepRecipes.every(r=>r.items.every(validFood)&&mealTotals({...r,eaten:1}).k>0)'));});
+test('Saved recipes and weights survive backup validation',()=>{assert.equal(run('validate({...state,recipes:[prepRecipes[0]]}).recipes.length'),1);});
+test('Malformed recipe quantities and weights rejected',()=>{assert.throws(()=>run('validate({...state,recipes:[{...prepRecipes[0],items:[{...prepRecipes[0].items[0],qty:-1}]}]})'));assert.throws(()=>run('validate({...state,days:{[today]:{complete:false,meals:[],weight:{kg:NaN,note:""}}}})'));});
+test('Food catalog includes tacos and spaghetti with labeled estimate ranges',()=>{assert.ok(run('research.commonMeals.some(m=>m.name==="Tacos"&&m.calorieRange.length===2)'));assert.ok(run('research.commonMeals.some(m=>m.name==="Spaghetti"&&m.kind==="rough estimate")'));});
+test('Local directory has broad coverage and every listing has a source',()=>assert.ok(run('places.length>=70&&places.every(p=>p.source&&p.locationUrl)')));
+run(fs.readFileSync('accounts.js','utf8'));
+test('Account caches use distinct keys',()=>assert.notEqual(run('accountKey("user-a")'),run('accountKey("user-b")')));
+console.log(`${count} total functional checks passed.`);
+
