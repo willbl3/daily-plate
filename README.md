@@ -40,7 +40,7 @@ vendor-supabase.js is the official UMD client pinned to supabase-js 2.118.0 (MIT
 
 Serve the directory with any static HTTP server, e.g. python -m http.server 8080. No frontend build is required. Signup/recovery CORS permits the production GitHub origin; test these there or configure an authorized development origin.
 
-Run node verify.cjs for 22 functional checks. Live API checks also verified signup, independent sessions, private saving/loading, account isolation, stale-write rejection, denial of anonymous/recovery-table reads and code-based recovery. Synthetic QA accounts were removed.
+Run node verify.cjs for 36 functional checks. Live API checks also verified signup, independent sessions, private saving/loading, account isolation, stale-write rejection, denial of anonymous/recovery-table reads and code-based recovery. Synthetic QA accounts were removed.
 
 ## Nutrition sources
 
@@ -51,3 +51,13 @@ NIH planner: https://www.niddk.nih.gov/health-information/weight-management/body
 Food storage: https://www.foodsafety.gov/food-safety-charts/cold-food-storage-charts
 
 Menu sources are linked in the app and food-data.js. Generic foods/recipes are estimates; product labels and portions matter. Pace initially uses 500 kcal/day per 1 lb/week, capped at a 25% maintenance deficit or 15% surplus, with 1,500 kcal male / 1,200 female floors. Weight and muscle change are not guaranteed.
+
+## Workouts, Apple Health and calorie balance
+
+The journal homepage shows calories in, calories out and net total (food minus resting plus active expenditure). Calories out uses entered/imported resting energy or a whole-day Mifflin estimate, plus the daily Move total when present, otherwise logged workout active calories. Daily Move totals already include workouts; these are never added twice. Missing unlogged movement means the estimate is incomplete. Current-day totals are provisional, and the food goal is not automatically increased by exercise.
+
+Log workouts using active kcal directly, or estimate net energy above rest from MET, weight and duration. The red Apple Move ring records active kcal; Exercise ring minutes are tracked separately and do not add calories.
+
+Apple Health is file-based rather than live HealthKit access: Health app > profile > Export All Health Data, then select export.zip or export.xml. Import reads the file locally in streamed chunks; only the reviewed activity summaries and workouts are saved/synced. Unrelated health records and the full export are not uploaded. Select a date range (90 days by default, three years max) and one sample/workout source. Daily ring summaries take priority; different device sources are not summed. Exact energy-record duplicates and repeat workout imports are deduplicated. Raw sample totals can differ from Health’s own source-priority calculations. Energy samples use their recorded start-date day; sessions crossing midnight are assigned to the start day.
+
+ZIP support uses fflate 0.8.3 (MIT), bundled with its license in vendor-fflate.js. File reads limit compressed input to 500 MB and expanded XML to 1 GB. Very large exports may require extracting export.xml separately.

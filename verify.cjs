@@ -48,3 +48,41 @@ run(fs.readFileSync('accounts.js','utf8'));
 test('Account caches use distinct keys',()=>assert.notEqual(run('accountKey("user-a")'),run('accountKey("user-b")')));
 console.log(`${count} total functional checks passed.`);
 
+// Workout and Apple Health import regression checks.
+context.TextDecoder=TextDecoder;context.TextEncoder=TextEncoder;
+el('workoutKind').value='walk';el('workoutMinutes').value='30';el('workoutEffort').value='moderate';
+run(fs.readFileSync('activity.js','utf8'));
+run('state={version:1,days:{},goals:[calculate(profile)],custom:[],recipes:[]};state.days[today]={complete:false,meals:[{id:"meal",name:"Food",type:"Lunch",servings:1,eaten:1,items:[{name:"Food",k:1000,p:50,c:100,f:20,basis:1,qty:1,unit:"serving"}]}],workouts:[{id:"w1",name:"Run",minutes:30,activeKcal:300,source:"manual"},{id:"w2",name:"Walk",minutes:30,activeKcal:200,source:"manual"}]};');
+test('Calories out adds resting plus workout active calories',()=>{assert.equal(run('dailyBalance(today).out'),2400);assert.equal(run('dailyBalance(today).net'),-1400);});
+test('Move ring replaces rather than doubles workout calories',()=>{run('state.days[today].activity={moveKcal:600,source:"manual",sourceName:"Move ring"}');assert.equal(run('dailyBalance(today).active'),600);assert.equal(run('dailyBalance(today).out'),2500);});
+test('Explicit resting energy replaces the profile estimate',()=>{run('state.days[today].activity.restingKcal=1800');assert.equal(run('dailyBalance(today).out'),2400);});
+test('Zero Move calories is a valid daily override',()=>{run('state.days[today].activity.moveKcal=0');assert.equal(run('dailyBalance(today).active'),0);});
+test('Net workout estimate excludes resting calories',()=>assert.equal(run('workoutBurn("walk","moderate",30,80)'),105));
+test('Missing profile/resting calories produces unknown total out',()=>{run('state.goals=[];delete state.days[today].activity');assert.equal(run('dailyBalance(today).out'),null);});
+test('Apple energy units convert correctly',()=>{assert.ok(Math.abs(run('healthEnergy(418.4,"kJ")')-100)<.001);assert.equal(run('healthEnergy(4184,"J")'),1);assert.equal(run('healthEnergy(10,"unknown")'),null);});
+context.fixtureXML=`<?xml version="1.0"?><HealthData locale="en_US">
+<Record type="HKQuantityTypeIdentifierActiveEnergyBurned" sourceName="My Watch" device="&lt;HKDevice > watch&gt;" unit="kcal" startDate="2026-10-17 10:00:00 -0500" endDate="2026-10-17 10:05:00 -0500" value="100"/>
+<Record type="HKQuantityTypeIdentifierActiveEnergyBurned" sourceName="My Watch" device="&lt;HKDevice > watch&gt;" unit="kcal" startDate="2026-10-17 10:00:00 -0500" endDate="2026-10-17 10:05:00 -0500" value="100"/>
+<Record type="HKQuantityTypeIdentifierActiveEnergyBurned" sourceName="My Phone" unit="kcal" startDate="2026-10-17 10:00:00 -0500" endDate="2026-10-17 10:05:00 -0500" value="900"/>
+<Record type="HKQuantityTypeIdentifierBasalEnergyBurned" sourceName="My Watch" unit="kcal" startDate="2026-10-17 00:00:00 -0500" endDate="2026-10-17 23:59:00 -0500" value="1600"/>
+<Record type="HKQuantityTypeIdentifierActiveEnergyBurned" sourceName="My Watch" unit="kcal" startDate="2020-10-17 10:00:00 -0500" value="999"/>
+<ActivitySummary dateComponents="2026-10-17" activeEnergyBurned="600" activeEnergyBurnedGoal="500" activeEnergyBurnedUnit="kcal" appleExerciseTime="45"/>
+<Workout workoutActivityType="HKWorkoutActivityTypeRunning" sourceName="My Watch" duration="30" durationUnit="min" startDate="2026-10-17 10:00:00 -0500" endDate="2026-10-17 10:30:00 -0500"><WorkoutStatistics type="HKQuantityTypeIdentifierActiveEnergyBurned" sum="300" unit="kcal"/></Workout>
+</HealthData>`;
+run('var sampleReader=makeHealthReader("2026-10-16","2026-10-18");for(var i=0;i<fixtureXML.length;i+=73)sampleReader.push(fixtureXML.slice(i,i+73));sampleReader.push("",true);pendingHealth=sampleReader.result();');
+test('Streaming XML handles split tags, dates and exact sample duplicates',()=>{assert.equal(run('pendingHealth.sources.get("My Watch").get("2026-10-17").moveKcal'),100);assert.equal(run('pendingHealth.sources.get("My Watch").size'),1);});
+test('Health import uses ring summary and one selected energy source',()=>{assert.equal(run('reviewedHealth("My Watch").get("2026-10-17").moveKcal'),600);assert.equal(run('reviewedHealth("My Watch").get("2026-10-17").restingKcal'),1600);});
+test('Modern Apple workout statistics are read without duplicating the ring',()=>assert.equal(run('reviewedHealth("My Watch").get("2026-10-17").workouts[0].activeKcal'),300));
+test('Non-Health XML is rejected',()=>assert.throws(()=>run('makeHealthReader("2026-01-01",today).push("<other/>",true)')));
+test('Reimport preserves meals and weight and does not duplicate workouts',()=>{run('state.days["2026-10-17"]={complete:false,meals:structuredClone(state.days[today].meals),weight:{kg:80,note:"kept"}}');el('healthSource').value='My Watch';el('confirmHealthImport').onclick();run('pendingHealth=sampleReader.result()');el('confirmHealthImport').onclick();assert.equal(run('state.days["2026-10-17"].workouts.length'),1);assert.equal(run('state.days["2026-10-17"].meals.length'),1);assert.equal(run('state.days["2026-10-17"].weight.kg'),80);assert.equal(run('dailyBalance("2026-10-17").out'),2200);});
+test('Workout/activity fields round trip and reject bad values',()=>{assert.equal(run('validate(JSON.parse(JSON.stringify(state))).days["2026-10-17"].activity.moveKcal'),600);assert.throws(()=>run('validate({...state,days:{[today]:{complete:false,meals:[],activity:{source:"manual",sourceName:"test",moveKcal:-1}}}})'));});
+context.setTimeout=(fn,ms)=>ms===0?setTimeout(fn,0):0;
+run(fs.readFileSync('vendor-fflate.js','utf8'));context.window.fflate=context.fflate;
+(async()=>{
+ const zip=run('fflate.zipSync({"apple_health_export/export.xml":new TextEncoder().encode(fixtureXML),"apple_health_export/other.xml":new TextEncoder().encode("ignored")})');
+ const blob=new Blob([zip]);blob.name='export.zip';context.zipFixture=blob;
+ const parsed=await run('readHealthFile(zipFixture,"2026-10-16","2026-10-18",()=>{})');
+ assert.equal(parsed.summaries.get('2026-10-17').moveKcal,600);count++;console.log('PASS ZIP import extracts export.xml and reads ring summaries');
+ console.log(`${count} total checks passed.`);
+})().catch(e=>{console.error(e);process.exitCode=1;});
+
